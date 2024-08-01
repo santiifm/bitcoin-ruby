@@ -40,15 +40,18 @@ module Bitcoin
     #  Bitcoin::Key.new(nil, pubkey)
     def initialize(privkey = nil, pubkey = nil, opts={compressed: true})
       compressed = opts.is_a?(Hash) ? opts.fetch(:compressed, true) : opts
-      @key = Bitcoin.bitcoin_elliptic_curve
       @pubkey_compressed = pubkey ? self.class.is_compressed_pubkey?(pubkey) : compressed
-      set_priv(privkey)  if privkey
-      set_pub(pubkey, @pubkey_compressed)  if pubkey
+      @key = if privkey
+              pkey_from_private_key(privkey)
+            else
+              Bitcoin.bitcoin_elliptic_curve
+            end
+      set_pub(pubkey, @pubkey_compressed) if pubkey
     end
 
     # Generate new priv/pub key.
     def generate
-      @key.generate_key
+      @key
     end
 
     # Get the private key (in hex).
@@ -155,7 +158,7 @@ module Bitcoin
 
       version = signature.unpack('C')[0]
       return nil if version < 27 or version > 34
- 
+
       compressed = (version >= 31) ? (version -= 4; true) : false
 
       hash = Bitcoin.bitcoin_signed_message_hash(data)
@@ -257,11 +260,34 @@ module Bitcoin
       set_pub(Bitcoin::OpenSSL_EC.regenerate_key(priv)[1], @pubkey_compressed)
     end
 
-    # Set +priv+ as the new private key (converting from hex).
-    def set_priv(priv)
-      value = priv.to_i(16)
-      raise 'private key is not on curve' unless MIN_PRIV_KEY_MOD_ORDER <= value && value <= MAX_PRIV_KEY_MOD_ORDER
-      @key.private_key = OpenSSL::BN.from_hex(priv)
+    def pkey_from_private_key(private_key)
+      public_key = restore_public_key(private_key)
+
+      group = OpenSSL::PKey::EC::Group.new('secp256k1')
+
+      private_key_bn = OpenSSL::BN.new(private_key, 16)
+      public_key_bn = OpenSSL::BN.new(public_key, 16)
+      public_key_point = OpenSSL::PKey::EC::Point.new(group, public_key_bn)
+
+      asn1 = OpenSSL::ASN1::Sequence(
+        [
+          OpenSSL::ASN1::Integer.new(1),
+          OpenSSL::ASN1::OctetString(private_key_bn.to_s(2)),
+          OpenSSL::ASN1::ObjectId('secp256k1', 0, :EXPLICIT),
+          OpenSSL::ASN1::BitString(public_key_point.to_octet_string(:uncompressed), 1, :EXPLICIT)
+        ]
+      )
+
+      OpenSSL::PKey::EC.new(asn1.to_der)
+    end
+
+    def restore_public_key(private_key)
+      private_bn = OpenSSL::BN.new private_key, 16
+      group = OpenSSL::PKey::EC::Group.new('secp256k1')
+      public_bn = group.generator.mul(private_bn).to_bn
+      public_bn = OpenSSL::PKey::EC::Point.new(group, public_bn).to_bn
+
+      public_bn.to_s(16).downcase
     end
 
     # Set +pub+ as the new public key (converting from hex).
@@ -277,4 +303,3 @@ module Bitcoin
   end
 
 end
-
