@@ -12,7 +12,7 @@ module Bitcoin
   # deprecated in favor of a unification of Fixnum and BigInteger named Integer.
   # Since this project strivers for backwards-compatability, we determine the
   # appropriate class to use at initialization.
-  # 
+  #
   # This avoids annoying deprecation warnings on newer versions for ourselves
   # and library consumers.
   Integer =
@@ -286,11 +286,11 @@ module Bitcoin
     end
 
     def bitcoin_elliptic_curve
-      ::OpenSSL::PKey::EC.new("secp256k1")
+      ::OpenSSL::PKey::EC.generate('secp256k1')
     end
 
     def generate_key
-      key = bitcoin_elliptic_curve.generate_key
+      key = bitcoin_elliptic_curve
       inspect_key( key )
     end
 
@@ -548,7 +548,6 @@ module Bitcoin
   class ::String
     include Bitcoin::BinaryExtensions
   end
-
 
   module ::OpenSSL
     class BN
