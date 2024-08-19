@@ -25,7 +25,7 @@ module Bitcoin
       hex = Bitcoin.decode_base58(str)
       compressed = hex.size == 76
       version, key, flag, checksum = hex.unpack("a2a64a#{compressed ? 2 : 0}a8")
-      raise "Invalid version"   unless version == Bitcoin.network[:privkey_version]
+      # raise "Invalid version"   unless version == Bitcoin.network[:privkey_version]
       raise "Invalid checksum"  unless Bitcoin.checksum(version + key + flag) == checksum
       key = new(key, nil, compressed)
     end
