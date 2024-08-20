@@ -394,8 +394,13 @@ module Bitcoin
     end
 
     def verify_signature(hash, signature, public_key)
-      key  = bitcoin_elliptic_curve
-      key.public_key = ::OpenSSL::PKey::EC::Point.from_hex(key.group, public_key)
+      group = OpenSSL::PKey::EC::Group.new('secp256k1')
+      public_key_bn = OpenSSL::BN.new(public_key, 16)
+      public_key_point = OpenSSL::PKey::EC::Point.new(group, public_key_bn)
+
+      key = OpenSSL::PKey::EC.new(group)
+      key.public_key = public_key_point
+
       signature = Bitcoin::OpenSSL_EC.repack_der_signature(signature)
       if signature
         key.dsa_verify_asn1(hash, signature)
